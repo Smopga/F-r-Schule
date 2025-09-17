@@ -2,204 +2,67 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>Platformer Game</title>
+  <title>Website Viewer</title>
   <style>
-    body { margin: 0; background: #222; color: white; font-family: sans-serif; }
-    canvas { display: block; margin: auto; background: linear-gradient(#87CEEB, #66B2FF); }
-    #ui { text-align: center; padding: 10px; font-size: 20px; }
-    .heart { color: red; font-size: 22px; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    header {
+      background: #333;
+      color: white;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    input {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      border-radius: 4px;
+    }
+    button {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    iframe {
+      flex: 1;
+      width: 100%;
+      border: none;
+    }
   </style>
 </head>
 <body>
-  <div id="ui">
-    <span id="lives"></span> | Level: <span id="level">1</span>
-  </div>
-  <canvas id="game" width="800" height="450"></canvas>
+  <header>
+    <input id="urlInput" type="text" placeholder="https://example.com">
+    <button onclick="loadSite()">Öffnen</button>
+  </header>
+  <iframe id="viewer"></iframe>
 
   <script>
-    const canvas = document.getElementById("game");
-    const ctx = canvas.getContext("2d");
-    const livesUI = document.getElementById("lives");
-    const levelUI = document.getElementById("level");
+    function loadSite() {
+      const input = document.getElementById('urlInput').value.trim();
+      const iframe = document.getElementById('viewer');
+      let url = input;
 
-    let keys = {};
-    document.addEventListener("keydown", e => keys[e.code] = true);
-    document.addEventListener("keyup", e => keys[e.code] = false);
-
-    let player, enemies, goal, platforms, level, gravity = 0.6;
-
-    // === Level-Daten ===
-    const levels = [
-      {
-        platforms: [
-          {x: 0, y: 430, w: 800, h: 20},   // Boden
-          {x: 200, y: 350, w: 120, h: 20},
-          {x: 400, y: 280, w: 120, h: 20}
-        ],
-        enemies: [
-          {x: 300, y: 400, w: 30, h: 30, dir: 1}
-        ],
-        goal: {x: 720, y: 370, w: 40, h: 60}
-      },
-      {
-        platforms: [
-          {x: 0, y: 430, w: 800, h: 20},
-          {x: 150, y: 360, w: 100, h: 20},
-          {x: 300, y: 300, w: 120, h: 20},
-          {x: 500, y: 240, w: 120, h: 20},
-        ],
-        enemies: [
-          {x: 180, y: 330, w: 30, h: 30, dir: 1},
-          {x: 520, y: 210, w: 30, h: 30, dir: -1}
-        ],
-        goal: {x: 750, y: 180, w: 40, h: 60}
-      },
-      {
-        platforms: [
-          {x: 0, y: 430, w: 800, h: 20},
-          {x: 100, y: 370, w: 120, h: 20},
-          {x: 260, y: 320, w: 120, h: 20},
-          {x: 420, y: 270, w: 120, h: 20},
-          {x: 580, y: 220, w: 120, h: 20},
-        ],
-        enemies: [
-          {x: 120, y: 340, w: 30, h: 30, dir: 1},
-          {x: 280, y: 290, w: 30, h: 30, dir: -1},
-          {x: 600, y: 190, w: 30, h: 30, dir: 1}
-        ],
-        goal: {x: 720, y: 150, w: 40, h: 60}
-      }
-    ];
-
-    function resetLevel(lvl = 1) {
-      if (lvl > levels.length) {
-        alert("🎉 Du hast alle Level geschafft!");
-        lvl = 1;
-      }
-      level = lvl;
-      levelUI.textContent = level;
-      player = {x: 50, y: 350, w: 30, h: 40, dx: 0, dy: 0, lives: player ? player.lives : 3};
-      platforms = levels[level - 1].platforms;
-      enemies = JSON.parse(JSON.stringify(levels[level - 1].enemies));
-      goal = levels[level - 1].goal;
-      updateLivesUI();
-    }
-
-    function updateLivesUI() {
-      livesUI.innerHTML = "❤️".repeat(player.lives);
-    }
-
-    function update() {
-      // Bewegung
-      if (keys["ArrowLeft"] || keys["KeyA"]) player.dx = -4;
-      else if (keys["ArrowRight"] || keys["KeyD"]) player.dx = 4;
-      else player.dx = 0;
-
-      if ((keys["ArrowUp"] || keys["Space"]) && player.onGround) {
-        player.dy = -12;
-        player.onGround = false;
+      // Falls der User nur "example.com" schreibt, automatisch "https://" ergänzen
+      if (!/^https?:\/\//i.test(url)) {
+        url = "https://" + url;
       }
 
-      player.dy += gravity;
-      player.x += player.dx;
-      player.y += player.dy;
-
-      player.onGround = false;
-
-      // Plattform-Kollision
-      for (let p of platforms) {
-        if (player.x < p.x + p.w &&
-            player.x + player.w > p.x &&
-            player.y < p.y + p.h &&
-            player.y + player.h > p.y) {
-          // Von oben drauf landen
-          if (player.dy >= 0 && player.y + player.h - player.dy <= p.y + 5) {
-            player.y = p.y - player.h;
-            player.dy = 0;
-            player.onGround = true;
-          }
-        }
-      }
-
-      // Gegner bewegen
-      enemies.forEach(e => {
-        e.x += e.dir * 2;
-        if (e.x < 50 || e.x > 750) e.dir *= -1;
-      });
-
-      // Kollision mit Gegnern
-      enemies.forEach(e => {
-        if (player.x < e.x + e.w &&
-            player.x + player.w > e.x &&
-            player.y < e.y + e.h &&
-            player.y + player.h > e.y) {
-          player.lives--;
-          updateLivesUI();
-          if (player.lives <= 0) {
-            alert("💀 Game Over!");
-            resetLevel(1);
-          } else {
-            player.x = 50;
-            player.y = 350;
-            player.dx = 0;
-            player.dy = 0;
-          }
-        }
-      });
-
-      // Ziel erreicht
-      if (player.x < goal.x + goal.w &&
-          player.x + player.w > goal.x &&
-          player.y < goal.y + goal.h &&
-          player.y + player.h > goal.y) {
-        resetLevel(level + 1);
-      }
+      iframe.src = url;
     }
-
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Berge (Hintergrund)
-      ctx.fillStyle = "#228B22";
-      ctx.beginPath();
-      ctx.moveTo(0, 430);
-      ctx.lineTo(150, 250);
-      ctx.lineTo(300, 430);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.moveTo(300, 430);
-      ctx.lineTo(500, 200);
-      ctx.lineTo(700, 430);
-      ctx.closePath();
-      ctx.fill();
-
-      // Plattformen
-      ctx.fillStyle = "sienna";
-      platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
-
-      // Spieler
-      ctx.fillStyle = "blue";
-      ctx.fillRect(player.x, player.y, player.w, player.h);
-
-      // Gegner
-      ctx.fillStyle = "red";
-      enemies.forEach(e => ctx.fillRect(e.x, e.y, e.w, e.h));
-
-      // Ziel (Flagge)
-      ctx.fillStyle = "gold";
-      ctx.fillRect(goal.x, goal.y, goal.w, goal.h);
-    }
-
-    function loop() {
-      update();
-      draw();
-      requestAnimationFrame(loop);
-    }
-
-    resetLevel(1);
-    loop();
   </script>
 </body>
 </html>
